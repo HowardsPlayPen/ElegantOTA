@@ -11,6 +11,11 @@
 </p>
 <br/>
 
+<p align="center">Includes patch to configurably use PsychicHttp instead of AsyncWebServer</p>
+<p align="center">
+See examples/PsychicHttp folder for more details. See platform.ini for build option needed to activate PsychicHttp
+</p>
+<br/>
 
 <p align="center">OTA update library for wireless microcontrollers</p>
 <p align="center">
