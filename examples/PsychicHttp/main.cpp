@@ -40,8 +40,6 @@ PsychicHttpServer server;
 const char* ssid = "........";
 const char* password = "........";
 
-AsyncWebServer server(80);
-
 unsigned long ota_progress_millis = 0;
 
 void onOTAStart() {
