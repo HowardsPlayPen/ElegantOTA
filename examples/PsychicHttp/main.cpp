@@ -27,9 +27,9 @@
   #include <ESPAsyncTCP.h>
 #elif defined(ESP32)
   #include <WiFi.h>
-  #include <AsyncTCP.h>
 #endif
 
+#include <ElegantOTA.h>
 #include <PsychicHttp.h>
 
 PsychicWebSocketHandler websocketHandler;
@@ -85,6 +85,12 @@ void setup(void) {
 
   server.listen(80); // NOTE: for PsychicHttp you MUST call listen() before registering any urls using .on()
 
+  // Set Authentication Credentials
+  ElegantOTA.setAuth("test", "test");
+
+  //setup server config stuff here
+  server.config.max_uri_handlers = 20; //maximum number of uri handlers (.on() calls)
+
   server.onOpen([](PsychicClient *client) {
     Serial.printf("[http] connection #%u connected from %s\n", client->socket(), client->remoteIP().toString());
   });
@@ -100,7 +106,6 @@ void setup(void) {
   ElegantOTA.onProgress(onOTAProgress);
   ElegantOTA.onEnd(onOTAEnd);
 
-  server.begin();
   Serial.println("HTTP server started");
 }
 
