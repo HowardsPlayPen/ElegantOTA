@@ -1,5 +1,10 @@
 #include "ElegantOTA.h"
 
+#if defined(ELEGANTOTA_USE_PSYCHIC)
+AuthenticationMiddleware basicAuth;
+#endif
+
+
 ElegantOTAClass::ElegantOTAClass(){}
 
 void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username, const char * password){
@@ -24,23 +29,27 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
       request->send(response);
     });
   #elif defined(ELEGANTOTA_USE_PSYCHIC)
-    PsychicEndpoint* endpoint = _server->on("/update", HTTP_GET, [this](PsychicRequest *request){
+    PsychicEndpoint* endpoint = _server->on("/update", HTTP_GET, [this](PsychicRequest *request, PsychicResponse* response){
 
-       PsychicResponse response(request);
-        response.setCode(200);
-        response.setContentType("text/html");
+        response->setCode(200);
+        response->setContentType("text/html");
 
-        response.addHeader("Content-Encoding", "gzip");
+        response->addHeader("Content-Encoding", "gzip");
 
         //add our actual content
-        response.setContent(ELEGANT_HTML, sizeof(ELEGANT_HTML));
+        response->setContent(ELEGANT_HTML, sizeof(ELEGANT_HTML));
 
-        return response.send();
+        return response->send();
 
     });
     if(endpoint && _authenticate )
     {
-      endpoint->setAuthentication(_username, _password);
+      basicAuth.setUsername(_username);
+      basicAuth.setPassword(_password);
+      //basicAuth.setRealm(app_name);
+      basicAuth.setAuthMethod(HTTPAuthMethod::BASIC_AUTH);
+      basicAuth.setAuthFailureMessage("You must log in.");  
+      endpoint->addMiddleware(&basicAuth);    
     }
 
   #else
@@ -122,7 +131,7 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
       return request->send((Update.hasError()) ? 400 : 200, "text/plain", (Update.hasError()) ? _update_error_str.c_str() : "OK");
     });
   #elif defined(ELEGANTOTA_USE_PSYCHIC)
-    endpoint = _server->on("/ota/start", HTTP_GET, [this](PsychicRequest *request) {
+    endpoint = _server->on("/ota/start", HTTP_GET, [this](PsychicRequest *request, PsychicResponse* response) {
 
       // Get header x-ota-mode value, if present
       OTA_Mode mode = OTA_MODE_FIRMWARE;
@@ -147,7 +156,7 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
         ELEGANTOTA_DEBUG_MSG(String("MD5: "+hash+"\n").c_str());
         if (!Update.setMD5(hash.c_str())) {
           ELEGANTOTA_DEBUG_MSG("ERROR: MD5 hash not valid\n");          
-          return request->reply(400, "text/plain", "MD5 parameter invalid");
+          return response->send(400, "text/plain", "MD5 parameter invalid");
         }
       }
 
@@ -205,12 +214,12 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
         }
       #endif
 
-      return request->reply((Update.hasError()) ? 400 : 200, "text/plain", (Update.hasError()) ? _update_error_str.c_str() : "OK");            
+      return response->send((Update.hasError()) ? 400 : 200, "text/plain", (Update.hasError()) ? _update_error_str.c_str() : "OK");            
     });
 
     if(endpoint && _authenticate )
     {
-      endpoint->setAuthentication(_username, _password);
+      endpoint->addMiddleware(&basicAuth);      
     }
 
   #else
@@ -369,7 +378,7 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
         // Write chunked data to the free sketch space
         if(len){
             if (Update.write(data, len) != len) {
-                return request->reply(400, "text/plain", "Failed to write chunked data to free space");
+                return ESP_FAIL;                
             }
             _current_progress_size += len;
             // Progress update callback
@@ -388,28 +397,24 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
         }else{
             return ESP_OK; // TODO is this the right return code here?
         }
-
-
         return ESP_OK;
       });
 
       //gets called after upload has been handled
-      uploadHandler->onRequest([this](PsychicRequest *request)
+      uploadHandler->onRequest([this](PsychicRequest *request,  PsychicResponse* response)
       {
         // Post-OTA update callback
-        if (postUpdateCallback != NULL) postUpdateCallback(!Update.hasError());
-
-        PsychicResponse response(request);
+        if (postUpdateCallback != NULL) postUpdateCallback(!Update.hasError());        
         
-        response.setContentType("text/plain");
-        response.addHeader("Connection", "close");        
-        response.addHeader("Access-Control-Allow-Origin", "*");
+        response->setContentType("text/plain");
+        response->addHeader("Connection", "close");        
+        response->addHeader("Access-Control-Allow-Origin", "*");
 
         bool hasError = (Update.hasError());
-        response.setCode(hasError ? 400 : 200);        
-        response.setContent(hasError ? _update_error_str.c_str() : "OK");
+        response->setCode(hasError ? 400 : 200);        
+        response->setContent(hasError ? _update_error_str.c_str() : "OK");
 
-        esp_err_t err =  response.send();
+        esp_err_t err =  response->send();
 
         // Set reboot flag
         if (!Update.hasError()) {
@@ -421,7 +426,8 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
         return err;
       });
 
-      uploadHandler->setAuthentication(_username, _password);
+      if(_authenticate)
+        uploadHandler->addMiddleware(&basicAuth);
       
       _server->on("/ota/upload", HTTP_POST, uploadHandler);      
     

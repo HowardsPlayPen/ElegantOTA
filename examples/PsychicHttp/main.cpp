@@ -32,13 +32,19 @@
 #include <ElegantOTA.h>
 #include <PsychicHttp.h>
 
+#include <ESPmDNS.h>
+
 PsychicWebSocketHandler websocketHandler;
 PsychicEventSource eventSource;
 PsychicHttpServer server;
 
+// hostname for mdns (psychic.local)
+const char* local_hostname = "psychic";
 
 const char* ssid = "........";
 const char* password = "........";
+
+CorsMiddleware corsMiddleware;
 
 unsigned long ota_progress_millis = 0;
 
@@ -83,7 +89,23 @@ void setup(void) {
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 
-  server.listen(80); // NOTE: for PsychicHttp you MUST call listen() before registering any urls using .on()
+  // set up our esp32 to listen on the psychic.local domain
+  if (MDNS.begin(local_hostname))
+    MDNS.addService("http", "tcp", 80);
+  else
+    Serial.println("Error starting mDNS");
+
+  server.on("/ip", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+      String output = "Your IP is: " + request->client()->remoteIP().toString();
+      return response->send(output.c_str());
+    });
+
+  DefaultHeaders::Instance().addHeader("Server", "PsychicHttp");
+  
+  // this will send CORS headers on every HTTP_OPTIONS request that contains the Origin: header
+  server.addMiddleware(&corsMiddleware);
+
+  server.begin(); // NOTE: for PsychicHttp you MUST call this before registering any urls using .on()
 
   // Set Authentication Credentials
   ElegantOTA.setAuth("test", "test");
