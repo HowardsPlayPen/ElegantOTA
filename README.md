@@ -11,12 +11,16 @@
 </p>
 <br/>
 
+##  NOTE ON THIS FORK OF ELEGANTOTA
 <p align="center">Includes patch to configurably use PsychicHttp instead of AsyncWebServer</p>
 <p align="center">
-See examples/PsychicHttp folder for more details. See platform.ini for build option needed to activate PsychicHttp
+See examples/PsychicHttp folder for more details. See platformio.ini for build option needed to activate PsychicHttp
+
+I updated the code (Jan 2026) to support the latest PsychicHttp code (many elements had changed in this interface). I thought I had updated to head of ElegantOTA but GitHub is still claiming I havent - I will have another look at this one day as it works fine as is for me.
 </p>
 <br/>
 
+## Original ElegantOTA notes
 <p align="center">OTA update library for wireless microcontrollers</p>
 <p align="center">
 ElegantOTA provides a beautiful user interface to upload over-the-air firmware/filesystem updates to your hardware with precise status and progress. ElegantOTA is designed to make the process of OTA updates slick and simple!
